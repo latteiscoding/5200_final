@@ -415,7 +415,7 @@ public class Restaurants {
           int rowsAffected = ps.executeUpdate();
           if (rowsAffected > 0) {
             System.out.println("Update successfully! " + rowsAffected + " row has been deleted");
-            getMyReview();
+            getReservation();
           } else {
             System.out.println("No rows were updated. Reservation ID not found.");
           }
@@ -450,7 +450,7 @@ public class Restaurants {
           int rowsAffected = preparedStatement.executeUpdate();
           if (rowsAffected > 0) {
             System.out.println("Update successfully! " + rowsAffected + " row has been updated");
-            getMyReview();
+            getReservation();
           } else {
             System.out.println("No rows were updated. Reservation ID not found.");
           }
