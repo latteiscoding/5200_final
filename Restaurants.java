@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
@@ -181,6 +182,7 @@ public class Restaurants {
    * method to retrieve restaurants information.
    * */
   public void viewRestaurants() throws SQLException {
+
     // Implement logic to fetch and display restaurants from the database
     // Use a PreparedStatement to execute SQL queries
     Scanner inputscanner = new Scanner(System.in);
@@ -213,6 +215,7 @@ public class Restaurants {
    * fetch and display the restaurants using the filters given.
    * */
   public void filterAndChooseRestaurants(List<String> filters, String selectedRestaurant) throws SQLException {
+
     StringBuilder queryBuilder = new StringBuilder("SELECT * FROM restaurants WHERE ");
     for(String filter : filters) {
       String[] parts = filter.split(":");
@@ -240,29 +243,29 @@ public class Restaurants {
     // Execute the constructed query and display results.
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(queryBuilder.toString());
-    while(resultSet.next()) {
-      String name = resultSet.getString("restaurant_name");
-      String address = resultSet.getString("address");
-      Time openTime = resultSet.getTime("open_time");
-      Time closeTime = resultSet.getTime("close_time");
-      String area = resultSet.getString("area");
-      String category = resultSet.getString("category");
-      BigDecimal average_star = resultSet.getBigDecimal("avg_stars");
-      System.out.println("Restaurant name: " + name);
-      System.out.println("Area: " + area);
-      System.out.println("Category: " + category);
-      System.out.println("Average Stars: " + average_star);
-      System.out.println("Restaurant Hours: " + openTime + " - " + closeTime);
-      System.out.println("Direction: " + address);
-    }
-//    // prompt the user for restaurant selection.
-//    System.out.println("Please enter your selected restaurant (input the restaurant name): ");
-//    String selectedRes = scanner.nextLine();
-//    // check the validity of the input.
-//    while(!isValidRestaurantName(selectedRes, resultSet)) {
-//      System.out.println("Invalid input! please input a restaurant listed above. ");
-//      selectedRes = scanner.nextLine();}
-//    selectedRestaurant = selectedRes;
+      while(resultSet.next()) {
+        String name = resultSet.getString("restaurant_name");
+        String address = resultSet.getString("address");
+        Time openTime = resultSet.getTime("open_time");
+        Time closeTime = resultSet.getTime("close_time");
+        String area = resultSet.getString("area");
+        String category = resultSet.getString("category");
+        BigDecimal average_star = resultSet.getBigDecimal("avg_stars");
+        System.out.println("Restaurant name: " + name);
+        System.out.println("Area: " + area);
+        System.out.println("Category: " + category);
+        System.out.println("Average Stars: " + average_star);
+        System.out.println("Restaurant Hours: " + openTime + " - " + closeTime);
+        System.out.println("Direction: " + address);
+      }
+      // prompt the user for restaurant selection.
+      System.out.println("Please enter your selected restaurant (input the restaurant name): ");
+      String selectedRes = scanner.nextLine();
+      // check the validity of the input.
+      while(!isValidRestaurantName(selectedRes, resultSet)) {
+        System.out.println("Invalid input! please input a restaurant listed above. ");
+        selectedRes = scanner.nextLine();}
+      selectedRestaurant = selectedRes;
   }
 
   /***
@@ -338,11 +341,11 @@ public class Restaurants {
       // Process the result set
       while (resultSet.next()) {
         // Retrieve and print review details
-        int id  = resultSet.getInt(6);
-        int stars = resultSet.getInt(4);
-        Date date =  resultSet.getDate(1);
-        String reviewer = resultSet.getString(3);
-        String content = resultSet.getString(5);
+        int id  = resultSet.getInt("review_id");
+        int stars = resultSet.getInt("stars");
+        Date date =  resultSet.getDate("review_date");
+        String reviewer = resultSet.getString("reviewer");
+        String content = resultSet.getString("content");
         System.out.println("Review id: " + id + " Stars :" + stars + "Review Data: " + date
                 + " Reviewer: " + reviewer);
         System.out.println("Content: " + content);
@@ -424,8 +427,7 @@ public class Restaurants {
       e.printStackTrace();
     }
   }
-
-
+                           
   /**
    * retrieve menu info of the given restaurant.
    * */
@@ -487,7 +489,6 @@ public class Restaurants {
       e.printStackTrace();
     }
   }
-
 
   /**
    *
@@ -627,9 +628,7 @@ public class Restaurants {
     }
   }
 
-  /**
-   *
-   */
+
   public void modifyReservation() {
     Scanner inputscanner = new Scanner(System.in);
     String command = inputscanner.nextLine();
@@ -712,7 +711,7 @@ public class Restaurants {
     switch (choice) {
       case 1:
         try {
-          viewRestaurants();
+          viewRestaurants(scanner);
         } catch (SQLException e) {
           e.printStackTrace();
         }
