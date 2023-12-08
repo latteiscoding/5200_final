@@ -424,6 +424,72 @@ public class Restaurants {
       System.out.println("Reservation with ID " + reservationId + " created successfully!");
     }
   }
+
+ 
+  /**
+   * retrieve menu info of the given restaurant.
+   * */
+  private static void viewMenu(String selectedRes, Connection connection, Scanner scanner) {
+    // Implementation for viewing the menu
+    System.out.println("Viewing Menu ...");
+    String selectStatement = "SELECT * FROM menus WHERE restaurant_name = ?";
+    boolean continueViewing = true;
+    while (continueViewing) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
+        // Set parameter
+        preparedStatement.setString(1, selectedRes);
+        // Execute the SELECT statement
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          while (resultSet.next()) {
+            // Retrieve and display menu details
+            String menuName = resultSet.getString("menu_name");
+            String description = resultSet.getString("description");
+            System.out.println("Menu Name: " + menuName);
+            System.out.println("Description: " + description);
+            // Display more fields as needed
+            System.out.println("------");
+          }
+        }
+        System.out.println("Enter the menu name you want to view (type 'exit' to go back): ");
+        String userInput = scanner.nextLine();
+        retrieveCuisines(userInput, connection);
+
+        if ("exit".equalsIgnoreCase(userInput)) {
+          continueViewing = false;
+        }
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  /**
+   * retrieve cuisines info using a given menu name.
+   * */
+  public static void retrieveCuisines(String menuName, Connection connection) {
+    try {
+      String selectStatement = "SELECT name, price FROM cuisines WHERE menu_name = ?";
+      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
+        // Set parameter
+        preparedStatement.setString(1, menuName);
+
+        // Execute the SELECT statement
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          while (resultSet.next()) {
+            // Retrieve and display cuisine details
+            String cuisineName = resultSet.getString("name");
+            double price = resultSet.getDouble("price");
+            System.out.println("Cuisine Name: " + cuisineName + " Price: $" + price);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  
+  /**
    *
    */
   public void getMyReview() {
@@ -496,7 +562,7 @@ public class Restaurants {
             isStarValid = true;
           }
         }
-        
+
         System.out.println("Please provide new review content");
         String content = inputscanner.nextLine();
         Date newdate = Date.valueOf(LocalDate.now());
@@ -550,67 +616,8 @@ public class Restaurants {
   }
 
   /**
-   * retrieve menu info of the given restaurant.
-   * */
-  private static void viewMenu(String selectedRes, Connection connection, Scanner scanner) {
-    // Implementation for viewing the menu
-    System.out.println("Viewing Menu ...");
-    String selectStatement = "SELECT * FROM menus WHERE restaurant_name = ?";
-    boolean continueViewing = true;
-    while (continueViewing) {
-      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
-        // Set parameter
-        preparedStatement.setString(1, selectedRes);
-        // Execute the SELECT statement
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-          while (resultSet.next()) {
-            // Retrieve and display menu details
-            String menuName = resultSet.getString("menu_name");
-            String description = resultSet.getString("description");
-            System.out.println("Menu Name: " + menuName);
-            System.out.println("Description: " + description);
-            // Display more fields as needed
-            System.out.println("------");
-          }
-        }
-        System.out.println("Enter the menu name you want to view (type 'exit' to go back): ");
-        String userInput = scanner.nextLine();
-        retrieveCuisines(userInput, connection);
-
-        if ("exit".equalsIgnoreCase(userInput)) {
-          continueViewing = false;
-        }
-      } catch (SQLException e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
-  /**
-   * retrieve cuisines info using a given menu name.
-   * */
-  public static void retrieveCuisines(String menuName, Connection connection) {
-    try {
-      String selectStatement = "SELECT name, price FROM cuisines WHERE menu_name = ?";
-      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
-        // Set parameter
-        preparedStatement.setString(1, menuName);
-
-        // Execute the SELECT statement
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-          while (resultSet.next()) {
-            // Retrieve and display cuisine details
-            String cuisineName = resultSet.getString("name");
-            double price = resultSet.getDouble("price");
-            System.out.println("Cuisine Name: " + cuisineName + " Price: $" + price);
-          }
-        }
-      }
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-  }
-      
+   * 
+   */
   public void modifyReservation() {
     Scanner inputscanner = new Scanner(System.in);
     String command = inputscanner.nextLine();
