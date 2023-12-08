@@ -1,4 +1,5 @@
 import java.math.BigDecimal;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -6,7 +7,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
@@ -168,7 +172,7 @@ public class Restaurants {
   /**
    * method to retrieve restaurants information.
    * */
-  private void viewRestaurants() throws SQLException {
+  private void viewRestaurants(Scanner scanner) throws SQLException {
     // Implement logic to fetch and display restaurants from the database
     // Use a PreparedStatement to execute SQL queries
     List<String> filters = new ArrayList<>();
@@ -187,13 +191,18 @@ public class Restaurants {
       }
     } while (filterChoice != 0);
 
-    filterAndChooseRestaurants(filters);
+    //select a restaurant.
+    String selectedRestaurant = "";
+    filterAndChooseRestaurants(filters, selectedRestaurant);
+
+    //prompt the user to proceed with 4 options
+    restaurantMainMenu(scanner, selectedRestaurant, connection);
 
   }
   /**
    * fetch and display the restaurants using the filters given.
    * */
-  private void filterAndChooseRestaurants(List<String> filters) throws SQLException {
+  private void filterAndChooseRestaurants(List<String> filters, String selectedRestaurant) throws SQLException {
     StringBuilder queryBuilder = new StringBuilder("SELECT * FROM restaurants WHERE ");
     for(String filter : filters) {
       String[] parts = filter.split(":");
@@ -212,7 +221,7 @@ public class Restaurants {
           break;
         default:
           System.out.println("Invalid filter choice.");
-          return;
+          return ;
       }
     }
     // remove the trailing "AND" from the query.
@@ -243,6 +252,7 @@ public class Restaurants {
       while(!isValidRestaurantName(selectedRes, resultSet)) {
         System.out.println("Invalid input! please input a restaurant listed above. ");
         selectedRes = scanner.nextLine();}
+      selectedRestaurant = selectedRes;
   }
 
   /***
@@ -259,6 +269,213 @@ public class Restaurants {
     return false;
   }
 
+  /**
+   * show the main menu and access to 4 options.
+   */
+  private void restaurantMainMenu(Scanner scanner, String selectedRes, Connection connection) throws SQLException {
+    boolean exit = false;
+
+    while (!exit) {
+      // Display the main menu
+      System.out.println("Main Menu:");
+      System.out.println("a. View Reviews");
+      System.out.println("b. Add Reviews");
+      System.out.println("c. Make a New Reservation");
+      System.out.println("d. View the Menu");
+      System.out.println("e. Exit");
+
+      // Get user input for selecting an option
+      System.out.println("Enter your choice: ");
+      String choice = scanner.nextLine().toLowerCase();
+
+      switch (choice) {
+        case "a":
+          viewReviews(selectedRes, connection);
+          break;
+        case "b":
+          addReview(selectedRes, connection, scanner);
+          break;
+        case "c":
+          makeReservation(selectedRes, connection, scanner);
+          break;
+        case "d":
+          viewMenu(selectedRes, connection, scanner);
+          break;
+        case "e":
+          exit = true;
+          System.out.println("Exiting the application. Goodbye!");
+          break;
+        default:
+          System.out.println("Invalid choice. Please enter a valid option.");
+          break;
+      }
+    }
+  }
+
+  /**
+   * retrieve the reviews for a given restaurant name.
+   * */
+  private static void viewReviews(String resName, Connection connection) throws SQLException {
+    // Implementation for viewing reviews
+    System.out.println("Viewing Reviews...");
+    String callStatement = "{call GetReviewsByRestaurantName(?)}";
+    try (CallableStatement callableStatement = connection.prepareCall(callStatement)){
+      callableStatement.setString(1, resName);
+
+      // Execute the stored procedure
+      ResultSet resultSet = callableStatement.executeQuery();
+
+      // Process the result set
+      while (resultSet.next()) {
+        // Retrieve and print review details
+        int id  = resultSet.getInt("review_id");
+        int stars = resultSet.getInt("stars");
+        Date date =  resultSet.getDate("review_date");
+        String reviewer = resultSet.getString("reviewer");
+        String content = resultSet.getString("content");
+        System.out.println("Review id: " + id + " Stars :" + stars + "Review Data: " + date
+                + " Reviewer: " + reviewer);
+        System.out.println("Content: " + content);
+      }
+
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * insert a review to the reviews table.
+   * */
+  private void addReview(String restaurantName, Connection connection, Scanner scanner) {
+    // Implementation for adding a review
+    System.out.println("Adding Review...");
+    // get the stars.
+    System.out.println("Enter stars (1-5): ");
+    int stars = scanner.nextInt();
+
+    scanner.nextLine();  // Consume the newline character
+    // get the review contents.
+    System.out.println("Enter review content: ");
+    String content = scanner.nextLine();
+
+    String sql = "INSERT INTO reviews (review_date, restaurant, reviewer, stars, content) VALUES (?, ?, ?, ?, ?)";
+    try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+      // insert the current date.
+      preparedStatement.setDate(1, java.sql.Date.valueOf(java.time.LocalDate.now()));
+      preparedStatement.setString(2, restaurantName);
+      preparedStatement.setString(3, appUsername);
+      preparedStatement.setInt(4, stars);
+      preparedStatement.setString(5, content);
+
+      // Execute the INSERT statement
+      int rowsAffected = preparedStatement.executeUpdate();
+
+      if (rowsAffected > 0) {
+        System.out.println("Review added successfully!");
+      } else {
+        System.out.println("Failed to add the review.");
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * make reservation and check if the reserved time is in the restaurant's open hours.
+   * */
+  private void makeReservation(String selectedRes, Connection connection, Scanner scanner) {
+    // Implementation for making a new reservation
+    System.out.println("Making a New Reservation...");
+    // prompt reservation time.
+    System.out.println("Enter reservation time (YYYY-MM-DD HH:mm:ss): ");
+    String reservedTime = scanner.nextLine();
+    Timestamp rsTime = Timestamp.valueOf(reservedTime);
+    // prompt guest numbers.
+    System.out.println("Enter guest numbers: ");
+    int guestNumber = scanner.nextInt();
+
+    scanner.nextLine(); // Consume the newline character
+    //get the customer's username.
+    String customerName = appUsername;
+    String sql = "{call InsertReservationWithTimeCheck(?, ?, ?, ?)}";
+    try(CallableStatement callableStatement = connection.prepareCall(sql)) {
+      callableStatement.setTimestamp(1, rsTime);
+      callableStatement.setInt(2, guestNumber);
+      callableStatement.setString(3, customerName);
+      callableStatement.setString(4, selectedRes);
+      callableStatement.registerOutParameter(4, Types.INTEGER); // Register the OUT parameter for the generated ID
+      // Execute the stored procedure
+      callableStatement.executeUpdate();
+
+      // Retrieve the generated ID
+      int reservationId = callableStatement.getInt(4);
+      System.out.println("Reservation with ID " + reservationId + " created successfully!");
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * retrieve menu info of the given restaurant.
+   * */
+  private static void viewMenu(String selectedRes, Connection connection, Scanner scanner) {
+    // Implementation for viewing the menu
+    System.out.println("Viewing Menu ...");
+    String selectStatement = "SELECT * FROM menus WHERE restaurant_name = ?";
+    boolean continueViewing = true;
+    while (continueViewing) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
+        // Set parameter
+        preparedStatement.setString(1, selectedRes);
+        // Execute the SELECT statement
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          while (resultSet.next()) {
+            // Retrieve and display menu details
+            String menuName = resultSet.getString("menu_name");
+            String description = resultSet.getString("description");
+            System.out.println("Menu Name: " + menuName);
+            System.out.println("Description: " + description);
+            // Display more fields as needed
+            System.out.println("------");
+          }
+        }
+        System.out.println("Enter the menu name you want to view (type 'exit' to go back): ");
+        String userInput = scanner.nextLine();
+        retrieveCuisines(userInput, connection);
+
+        if ("exit".equalsIgnoreCase(userInput)) {
+          continueViewing = false;
+        }
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
+  /**
+   * retrieve cuisines info using a given menu name.
+   * */
+  public static void retrieveCuisines(String menuName, Connection connection) {
+    try {
+      String selectStatement = "SELECT name, price FROM cuisines WHERE menu_name = ?";
+      try (PreparedStatement preparedStatement = connection.prepareStatement(selectStatement)) {
+        // Set parameter
+        preparedStatement.setString(1, menuName);
+
+        // Execute the SELECT statement
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          while (resultSet.next()) {
+            // Retrieve and display cuisine details
+            String cuisineName = resultSet.getString("name");
+            double price = resultSet.getDouble("price");
+            System.out.println("Cuisine Name: " + cuisineName + " Price: $" + price);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
 
   public void run() {
     scanner = new Scanner(System.in);
@@ -279,7 +496,7 @@ public class Restaurants {
     switch (choice) {
       case 1:
         try {
-          viewRestaurants();
+          viewRestaurants(scanner);
         } catch (SQLException e) {
           e.printStackTrace();
         }
