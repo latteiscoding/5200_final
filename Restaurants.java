@@ -1,6 +1,7 @@
 import java.math.BigDecimal;
 import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,6 +10,7 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -40,7 +42,7 @@ public class Restaurants {
     String dbName = "fakeYelp_db";
     this.connection = DriverManager.getConnection("jdbc:mysql://"
             + serverName + ":" + portNumber + "/" + dbName
-            + "?characterEncoding=UTF-8&useSSL=false" + connectionProps);
+            + "?characterEncoding=UTF-8&useSSL=false", connectionProps);
   }
 
   /**
@@ -58,27 +60,35 @@ public class Restaurants {
   }
 
   public void getYelpLogin() {
-    System.out.println("Do you have an account?\nY - yes\nN - no");
-    String accountCheck = scanner.nextLine().toLowerCase();
+    boolean isValid = false;
+    Scanner inputscanner = new Scanner(System.in);
+    while (!isValid) {
+      System.out.println("Do you have an account?\nY - yes\nN - no");
+      String accountCheck = inputscanner.nextLine();
 
-    switch (accountCheck) {
-      case "y" -> login();
-      case "n" -> createLoginAccount();
-      default -> System.out.println("""
-              Invalid input!
-              Please enter 'y' if you have an account
-              Please enter 'n' if you don't' have an account""");
+      if (accountCheck.equalsIgnoreCase("y")) {
+        isValid = true;
+        login();
+      } else if (accountCheck.equalsIgnoreCase("n")) {
+        isValid = true;
+        createLoginAccount();
+      } else {
+        System.out.println("""
+                Invalid input!
+                Please enter 'y' if you have an account
+                Please enter 'n' if you don't' have an account""");
+      }
     }
   }
 
   private void login() {
     boolean loggedIn = false;
+    Scanner inputscanner = new Scanner(System.in);
     while (!loggedIn) {
       System.out.print("Enter username: ");
-      String inputUsername = scanner.nextLine();
-
+      String inputUsername = inputscanner.nextLine();
       System.out.print("Enter password: ");
-      String inputPassword = scanner.nextLine();
+      String inputPassword = inputscanner.nextLine();
       String sql = "SELECT user_name, password FROM users WHERE user_name = ?";
       try {
         PreparedStatement preparedStatement = connection.prepareStatement(sql);
@@ -112,17 +122,18 @@ public class Restaurants {
   }
 
   private void createLoginAccount() {
+    Scanner inputscanner = new Scanner(System.in);
     boolean usernameUniq = false;
     while (!usernameUniq) {
       System.out.println("Enter your new username: ");
-      String newUsername = scanner.nextLine();
+      String newUsername = inputscanner.nextLine();
 
       // Check if the entered username already exists
       if (usernameExists(newUsername)) {
         System.out.println("Username already exists. Please choose a different username.");
       } else {
         System.out.print("Enter a password: ");
-        String newPassword = scanner.nextLine();
+        String newPassword = inputscanner.nextLine();
 
         // Insert the new user into the database
         String sql = "INSERT INTO users (user_name, password) VALUES (?, ?)";
@@ -175,6 +186,7 @@ public class Restaurants {
   private void viewRestaurants(Scanner scanner) throws SQLException {
     // Implement logic to fetch and display restaurants from the database
     // Use a PreparedStatement to execute SQL queries
+    Scanner inputscanner = new Scanner(System.in);
     List<String> filters = new ArrayList<>();
     System.out.println("Choose filter options (enter 0 when done):");
     System.out.println("1. Area： Allston Cambridge Quincy Somerville");
@@ -183,10 +195,10 @@ public class Restaurants {
     int filterChoice;
 
     do {
-      filterChoice = scanner.nextInt();
+      filterChoice = inputscanner.nextInt();
       if(filterChoice != 0) {
         System.out.println("Enter your desired filter value: ");
-        String filterValue = scanner.nextLine();
+        String filterValue = inputscanner.nextLine();
         filters.add(filterChoice + ":" + filterValue); // record user's choices in the list.
       }
     } while (filterChoice != 0);
@@ -410,6 +422,128 @@ public class Restaurants {
       // Retrieve the generated ID
       int reservationId = callableStatement.getInt(4);
       System.out.println("Reservation with ID " + reservationId + " created successfully!");
+    }
+  }
+   *
+   */
+  public void getMyReview() {
+    String query = "{CALL get_my_review(?)}";
+    try {
+      CallableStatement statement = connection.prepareCall(query);
+      statement.setString(1, appUsername);
+
+      ResultSet reviews = statement.executeQuery();
+      System.out.println("Printing your reviews");
+      while (reviews.next()) {
+        System.out.printf("""
+                \nReview Id %d
+                Review Date %s
+                Restaurant %s
+                Stars %d
+                Content %s
+                """,
+                reviews.getInt(1),
+                reviews.getString(2),
+                reviews.getString(3),
+                reviews.getInt(4),
+                reviews.getString(5));
+      }
+    } catch (SQLException myReviewException) {
+      System.out.println("Cannot retrieve my reviews");
+      myReviewException.printStackTrace();
+    }
+  }
+
+  /**
+   *
+   */
+  public void modifyReview() {
+    Scanner inputscanner = new Scanner(System.in);
+    String command = inputscanner.nextLine();
+    if (!command.equalsIgnoreCase("delete") && !command.equalsIgnoreCase("edit")) {
+      System.out.println("Invalid Command.");
+    } else {
+      System.out.println("Please provide review id");
+      int reviewId = Integer.parseInt(inputscanner.nextLine());
+
+      if (command.equalsIgnoreCase("delete")) {
+        String sql = "DELETE FROM reviews WHERE review_id = ?";
+        try {
+          PreparedStatement ps = connection.prepareStatement(sql);
+          ps.setInt(1, reviewId);
+          int rowsAffected = ps.executeUpdate();
+          if (rowsAffected > 0) {
+            System.out.println("Update successfully! " + rowsAffected + " row has been deleted");
+            getMyReview();
+          } else {
+            System.out.println("No rows were updated. Review ID not found.");
+          }
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+
+      }
+
+      if (command.equalsIgnoreCase("edit")) {
+        boolean isStarValid = false;
+        int star = -1;
+        while (!isStarValid) {
+          System.out.println("Please provide new star");
+          star = Integer.parseInt(inputscanner.nextLine());
+          if (star > 5 || star < 0) {
+            System.out.println("Invalid stars. Provide a new one");
+          } else {
+            isStarValid = true;
+          }
+        }
+        
+        System.out.println("Please provide new review content");
+        String content = inputscanner.nextLine();
+        Date newdate = Date.valueOf(LocalDate.now());
+
+        String sql = "UPDATE reviews SET review_date = ?, stars = ?, content = ? WHERE review_id = ?";
+        try {
+          PreparedStatement preparedStatement = connection.prepareStatement(sql);
+          preparedStatement.setDate(1, newdate);
+          preparedStatement.setInt(2, star);
+          preparedStatement.setString(3, content);
+          preparedStatement.setInt(4, reviewId);
+          int rowsAffected = preparedStatement.executeUpdate();
+          if (rowsAffected > 0) {
+            System.out.println("Update successfully! " + rowsAffected + " row has been updated");
+            getMyReview();
+          } else {
+            System.out.println("No rows were updated. Review ID not found.");
+          }
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+
+  /**
+   *
+   */
+  public void getReservation() {
+    String query = "{CALL get_my_reservation(?)}";
+    try {
+      CallableStatement callableStatement = connection.prepareCall(query);
+      callableStatement.setString(1, "Katie E.");
+      ResultSet reservations = callableStatement.executeQuery();
+      System.out.println("Printing your reservations");
+      while (reservations.next()) {
+        System.out.printf("""
+                \nReservation ID %d
+                Reserved Time %s
+                Guest Number %d
+                Restaurant %s
+                """,
+                reservations.getInt(1),
+                reservations.getString(2),
+                reservations.getInt(3),
+                reservations.getString(4));
+      }
     } catch (SQLException e) {
       e.printStackTrace();
     }
@@ -476,6 +610,69 @@ public class Restaurants {
       e.printStackTrace();
     }
   }
+      
+  public void modifyReservation() {
+    Scanner inputscanner = new Scanner(System.in);
+    String command = inputscanner.nextLine();
+    if (!command.equalsIgnoreCase("delete") && !command.equalsIgnoreCase("edit")) {
+      System.out.println("Invalid Command.");
+    } else {
+      System.out.println("Please provide reservation id");
+      int reservationId = Integer.parseInt(inputscanner.nextLine());
+
+      if (command.equalsIgnoreCase("delete")) {
+        String sql = "DELETE FROM reservations WHERE id = ?";
+        try {
+          PreparedStatement ps = connection.prepareStatement(sql);
+          ps.setInt(1, reservationId);
+          int rowsAffected = ps.executeUpdate();
+          if (rowsAffected > 0) {
+            System.out.println("Update successfully! " + rowsAffected + " row has been deleted");
+            getReservation();
+          } else {
+            System.out.println("No rows were updated. Reservation ID not found.");
+          }
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+
+      }
+
+      if (command.equalsIgnoreCase("edit")) {
+        boolean isGuestNumValid = false;
+        int guest = -1;
+        while (!isGuestNumValid) {
+          System.out.println("Please provide new guest number");
+          guest = Integer.parseInt(inputscanner.nextLine());
+          if (guest > 8 || guest < 0) {
+            System.out.println("Invalid guest number. Provide a new one");
+          } else {
+            isGuestNumValid = true;
+          }
+        }
+
+        System.out.println("Please provide new date and time. Format: YYYY-MM-DD HH:MM");
+        String time = inputscanner.nextLine();
+
+        String sql = "UPDATE reservations SET reserved_time = ?, guest_number = ? WHERE id = ?";
+        try {
+          PreparedStatement preparedStatement = connection.prepareStatement(sql);
+          preparedStatement.setString(1, time);
+          preparedStatement.setInt(2, guest);
+          preparedStatement.setInt(3, reservationId);
+          int rowsAffected = preparedStatement.executeUpdate();
+          if (rowsAffected > 0) {
+            System.out.println("Update successfully! " + rowsAffected + " row has been updated");
+            getReservation();
+          } else {
+            System.out.println("No rows were updated. Reservation ID not found.");
+          }
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
 
   public void run() {
     scanner = new Scanner(System.in);
@@ -487,10 +684,10 @@ public class Restaurants {
         System.out.println("Connected to the database!");
         break;
       } catch (SQLException dbConnectionError) {
-        System.out.println("Connection failed. Error: " + dbConnectionError.getMessage());
+        System.out.println("Connection failed.\n Error: " + dbConnectionError.getMessage());
       }
     }
-    getYelpLogin();
+    // getYelpLogin();
     displayMenu();
     int choice = scanner.nextInt();
     switch (choice) {
@@ -503,10 +700,14 @@ public class Restaurants {
 
         break;
       case 2:
-        // viewReviews(connection);
+        getMyReview();
+        System.out.println("\nDo you want to modify your review? delete/edit");
+        modifyReview();
         break;
       case 3:
-        // viewReservations(connection);
+        getReservation();
+        System.out.println("\nDo you want to modify your reservation? delete/edit");
+        modifyReservation();
         break;
       default:
         System.out.println("Invalid choice. Please enter a valid option.");
