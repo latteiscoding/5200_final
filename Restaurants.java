@@ -8,103 +8,66 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class Restaurants {
-  public static void main(String[] args) {
-    run();
-  }
-  public static String appUsername;
-  public static void run() throws SQLException {
-    Scanner scanner = new Scanner(System.in);
 
-    // prompt for sql username and passwords.
-    String username, password;
-    String accountCheck;
+  private String sqlUsername;
+  private String sqlPassword;
+  private void setSqlUsername(String sqlUsername) { this.sqlUsername = sqlUsername; }
+  private void setSqlPassword(String sqlPassword) { this.sqlPassword = sqlPassword; }
 
-    boolean validInput, validCreate;
+  public Connection connection = null;
+  public Scanner scanner = null;
 
-    // Prompt the user for MySQL username and password
-    System.out.println("Enter MySQL username: ");
-    username = scanner.nextLine();
+  public String appUsername;
+  /**
+   * Get a new database connection
+   * @throws SQLException failed to connect
+   */
+  public void getConnection() throws SQLException {
+    Properties connectionProps = new Properties();
+    connectionProps.put("user", this.sqlUsername);
+    connectionProps.put("password", this.sqlPassword);
 
-    System.out.println("Enter MySQL password: ");
-    password = scanner.nextLine();
-
-    Connection connection = connectToDatabase(username, password);
-
-    if (connection != null) {
-      System.out.println("Connected to the database!");
-    }
-
-    // Prompt the user for the app username and password/
-    // Create an account if the user has no username.
-    // check if the input is valid -- only move forward when the input is valid.
-    do {
-      System.out.println("Do you have an account?\nY - yes\nN - no");
-      accountCheck = scanner.nextLine();
-    } while (!validateAccountInput(accountCheck));
-    // if the user has an account -- login.
-    if(accountCheck.equalsIgnoreCase("y")) {
-      login(connection, scanner);
-    }
-    // if the user does not have an account -- create and login.
-    if(accountCheck.equalsIgnoreCase("n")) {
-      createloginAccount(connection, scanner);
-    }
-    // three options:
-    // 1. view restaurants
-    // 2. view reviews created by the user.
-    // 3. view reservations made by the user.
-    displayMenu();
-    int choice = scanner.nextInt();
-    switch (choice) {
-      case 1:
-        viewRestaurants(connection, scanner);
-        break;
-      case 2:
-        // viewReviews(connection);
-        break;
-      case 3:
-        // viewReservations(connection);
-        break;
-      default:
-        System.out.println("Invalid choice. Please enter a valid option.");
-        break;
-    }
-  }
-
-  // connect to the database.
-  private static Connection connectToDatabase(String username, String password) {
-    try {
-      String url = "jdbc:mysql://localhost:3306/music1_db";
-      return DriverManager.getConnection(url, username, password);
-
-    } catch (SQLException e) {
-      System.out.println("Connection failed. Error: " + e.getMessage());
-      return null;
-    }
-  }
-  /** account existence input validity check.
-   * check if user input valid answer for having an account or not.
-   * anything other than y/ n is invalid.
-   * */
-  private static boolean validateAccountInput(String accountcheck) {
-
-    if(!accountcheck.equalsIgnoreCase("y") && !accountcheck.equalsIgnoreCase("n")) {
-      System.out.println("Invalid input! ");
-      System.out.println("please enter 'y' if you have an account\n please enter 'n' if you dont' have an account");
-      return false;
-    }
-    return true;
+    String serverName = "localhost";
+    int portNumber = 3306;
+    String dbName = "fakeYelp_db";
+    this.connection = DriverManager.getConnection("jdbc:mysql://"
+            + serverName + ":" + portNumber + "/" + dbName
+            + "?characterEncoding=UTF-8&useSSL=false" + connectionProps);
   }
 
   /**
-   * login method.
-   * check if the username and password is correct.
-   * else close the
+   * Prompt user for username and password
    */
-  private static void login(Connection connection, Scanner scanner) {
+  public void getSQLLogin() {
+    System.out.println("Please enter your MySQL username");
+    if (scanner.hasNext()) {
+      setSqlUsername(scanner.next());
+    }
+    System.out.println("Please enter your MySQL password");
+    if (scanner.hasNext()) {
+      setSqlPassword(scanner.next());
+    }
+  }
+
+  public void getYelpLogin() {
+    System.out.println("Do you have an account?\nY - yes\nN - no");
+    String accountCheck = scanner.nextLine().toLowerCase();
+
+    switch (accountCheck) {
+      case "y" -> login();
+      case "n" -> createLoginAccount();
+      default -> System.out.println("""
+              Invalid input!
+              Please enter 'y' if you have an account
+              Please enter 'n' if you don't' have an account""");
+    }
+  }
+
+  private void login() {
     boolean loggedIn = false;
     while (!loggedIn) {
       System.out.print("Enter username: ");
@@ -125,7 +88,8 @@ public class Restaurants {
 
           if (inputPassword.equals(storedPassword)) {
             System.out.println("Login successful!");
-            appUsername = storedUsername; // track the logged-in user.
+            this.appUsername = storedUsername; // track the logged-in user.
+            loggedIn = true;
           } else {
             System.out.println("Invalid password! Try again.");
           }
@@ -142,17 +106,15 @@ public class Restaurants {
       }
     }
   }
-  /**
-   * create a new account and login for the user.
-   * */
-  private static void createloginAccount(Connection connection, Scanner scanner) {
+
+  private void createLoginAccount() {
     boolean usernameUniq = false;
     while (!usernameUniq) {
       System.out.println("Enter your new username: ");
       String newUsername = scanner.nextLine();
 
       // Check if the entered username already exists
-      if (usernameExists(connection, newUsername)) {
+      if (usernameExists(newUsername)) {
         System.out.println("Username already exists. Please choose a different username.");
       } else {
         System.out.print("Enter a password: ");
@@ -167,7 +129,7 @@ public class Restaurants {
           preparedStatement.executeUpdate();
 
           System.out.println("Account created successfully!");
-          appUsername = newUsername; // track the logged-in user.
+          this.appUsername = newUsername; // track the logged-in user.
 
           // You can add additional steps or actions after creating the account
 
@@ -179,10 +141,7 @@ public class Restaurants {
     }
   }
 
-  /**
-   * Helper function to check if a username already exists in the database.
-   */
-  private static boolean usernameExists(Connection connection, String username) {
+  private boolean usernameExists(String username) {
     String sql = "SELECT user_name FROM users WHERE user_name = ?";
     try {
       PreparedStatement preparedStatement = connection.prepareStatement(sql);
@@ -199,10 +158,7 @@ public class Restaurants {
     }
   }
 
-  /**
-   * display 3 options for the user:  view restaurants, view reviews, view reservations.
-   * */
-  private static void displayMenu() {
+  private void displayMenu() {
     System.out.println("Choose an option:");
     System.out.println("1. View Restaurants");
     System.out.println("2. View Reviews");
@@ -212,7 +168,7 @@ public class Restaurants {
   /**
    * method to retrieve restaurants information.
    * */
-  private static void viewRestaurants(Connection connection, Scanner scanner) throws SQLException {
+  private void viewRestaurants() throws SQLException {
     // Implement logic to fetch and display restaurants from the database
     // Use a PreparedStatement to execute SQL queries
     List<String> filters = new ArrayList<>();
@@ -231,15 +187,13 @@ public class Restaurants {
       }
     } while (filterChoice != 0);
 
-    FilterandChooseRestaurants(connection, filters, scanner);
-
-
+    filterAndChooseRestaurants(filters);
 
   }
   /**
    * fetch and display the restaurants using the filters given.
    * */
-  private static void FilterandChooseRestaurants(Connection connection, List<String> filters, Scanner scanner) throws SQLException {
+  private void filterAndChooseRestaurants(List<String> filters) throws SQLException {
     StringBuilder queryBuilder = new StringBuilder("SELECT * FROM restaurants WHERE ");
     for(String filter : filters) {
       String[] parts = filter.split(":");
@@ -265,8 +219,8 @@ public class Restaurants {
     queryBuilder.setLength(queryBuilder.length() - 5);
 
     // Execute the constructed query and display results.
-    try(Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(queryBuilder.toString())) {
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(queryBuilder.toString());
       while(resultSet.next()) {
         String name = resultSet.getString("restaurant_name");
         String address = resultSet.getString("address");
@@ -288,34 +242,64 @@ public class Restaurants {
       // check the validity of the input.
       while(!isValidRestaurantName(selectedRes, resultSet)) {
         System.out.println("Invalid input! please input a restaurant listed above. ");
-        selectedRes = scanner.nextLine();
-      }
-
-
-
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-    }
+        selectedRes = scanner.nextLine();}
+  }
 
   /***
    * check if the user's input matches with any of filtered restaurants.
    */
-    private static boolean isValidRestaurantName(String enteredName, ResultSet resultSet) throws SQLException{
-      resultSet.beforeFirst(); // move the cursor back to the beginning.
-      while(resultSet.next()) {
-        String name = resultSet.getString("name");
-        if(enteredName.equalsIgnoreCase(name)) {
-          return true;
-        }
+  private boolean isValidRestaurantName(String enteredName, ResultSet resultSet) throws SQLException{
+    resultSet.beforeFirst(); // move the cursor back to the beginning.
+    while(resultSet.next()) {
+      String name = resultSet.getString("name");
+      if(enteredName.equalsIgnoreCase(name)) {
+        return true;
       }
-      return false;
     }
+    return false;
+  }
 
 
+  public void run() {
+    scanner = new Scanner(System.in);
 
+    while (true) {
+      try {
+        getSQLLogin();
+        getConnection();
+        System.out.println("Connected to the database!");
+        break;
+      } catch (SQLException dbConnectionError) {
+        System.out.println("Connection failed. Error: " + dbConnectionError.getMessage());
+      }
+    }
+    getYelpLogin();
+    displayMenu();
+    int choice = scanner.nextInt();
+    switch (choice) {
+      case 1:
+        try {
+          viewRestaurants();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
 
+        break;
+      case 2:
+        // viewReviews(connection);
+        break;
+      case 3:
+        // viewReservations(connection);
+        break;
+      default:
+        System.out.println("Invalid choice. Please enter a valid option.");
+        break;
+    }
+  }
 
-
+  public static void main(String[] args) {
+    Restaurants restaurants = new Restaurants();
+    restaurants.run();
+  }
 
 }
